@@ -294,23 +294,7 @@ func (c Capture) Or(other Capture) Capture {
 		SemanticExtraction:  c.SemanticExtraction || other.SemanticExtraction,
 	}
 
-	// Any gap whose flag is now satisfied is dropped; anything else — including
-	// names this package does not own — is preserved.
-	resolved := map[string]bool{}
-	for _, f := range out.missingFor() {
-		if f.ok {
-			resolved[f.name] = true
-		}
-	}
-	seen := map[string]bool{}
-	for _, name := range append(append([]string{}, c.Missing...), other.Missing...) {
-		if resolved[name] || seen[name] {
-			continue
-		}
-		seen[name] = true
-		out.Missing = append(out.Missing, name)
-	}
-
+	out.Missing = append(append([]string{}, c.Missing...), other.Missing...)
 	seenNote := map[string]bool{}
 	for _, n := range append(append([]string{}, c.Notes...), other.Notes...) {
 		if seenNote[n] {
@@ -319,7 +303,39 @@ func (c Capture) Or(other Capture) Capture {
 		seenNote[n] = true
 		out.Notes = append(out.Notes, n)
 	}
-	return out
+	return out.PruneMissing()
+}
+
+// PruneMissing drops any recorded gap whose corresponding flag is now
+// satisfied, and de-duplicates the rest.
+//
+// It exists because Missing and the flags are two views of the same fact, and a
+// merge can satisfy a gap that an earlier state recorded. Without pruning, a
+// state whose checkpoints were later found still carried "checkpoints" in
+// Missing, and the rendered output listed entire checkpoints under *Verified*
+// and again under *Unknown* — the reader cannot tell which half to believe, and
+// a self-contradicting report is worse than either answer alone.
+//
+// Names this package does not own are preserved untouched: a contributor that
+// records a gap of its own is entitled to keep it.
+func (c Capture) PruneMissing() Capture {
+	resolved := make(map[string]bool, 5)
+	for _, f := range c.missingFor() {
+		if f.ok {
+			resolved[f.name] = true
+		}
+	}
+	seen := make(map[string]bool, len(c.Missing))
+	kept := make([]string, 0, len(c.Missing))
+	for _, name := range c.Missing {
+		if resolved[name] || seen[name] {
+			continue
+		}
+		seen[name] = true
+		kept = append(kept, name)
+	}
+	c.Missing = kept
+	return c
 }
 
 // Complete reports whether every capture input was available.

@@ -617,7 +617,10 @@ func mergeCapture(prev, next model.Capture, hasNext bool) model.Capture {
 	}
 	out.Missing = dedupeStrings(concat(prev.Missing, next.Missing))
 	out.Notes = dedupeStrings(concat(prev.Notes, next.Notes))
-	return out
+	// A gap one side recorded may have been satisfied by the other. Carrying it
+	// forward regardless listed the same input as both verified and unknown in
+	// the rendered output.
+	return out.PruneMissing()
 }
 
 // ---------------------------------------------------------------------------
