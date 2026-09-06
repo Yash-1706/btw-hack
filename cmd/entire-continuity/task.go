@@ -25,6 +25,7 @@ const taskUsage = `entire-continuity task <subcommand>
   handoff     Render an evidence-backed handoff package
   resume      Rebuild the continuation context for a fresh worker
   lineage     Show the cross-agent lineage of a task
+  explain     Explain why the task is where it is, with evidence
   constraint  Record a new mid-task constraint without losing original intent
 `
 
@@ -46,6 +47,8 @@ func (a *app) task(ctx context.Context, args []string) error {
 		return a.taskResume(ctx, args[1:])
 	case "lineage":
 		return a.taskLineage(ctx, args[1:])
+	case "explain":
+		return a.taskExplain(ctx, args[1:])
 	case "constraint":
 		return a.taskConstraint(ctx, args[1:])
 	default:
@@ -451,4 +454,99 @@ func writeJSON(v any) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)
+}
+
+// taskExplain answers "why is this task where it is?" in the plan §50 shape:
+// the blocking fact, the likely reason, the evidence, and what to do next.
+//
+// It is deliberately assembled from the state rather than narrated: every line
+// below is either a recorded fact or is labelled as a recommendation, so the
+// answer cannot drift away from what the evidence supports.
+func (a *app) taskExplain(ctx context.Context, args []string) error {
+	ref, _ := firstArg(args)
+	t, err := a.resolveRef(ctx, ref)
+	if err != nil {
+		return err
+	}
+	state, _, _, err := a.currentState(ctx, t)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("WHY IS THIS TASK %s?\n\n", strings.ToUpper(string(state.Status)))
+
+	var evidence []model.Evidence
+	reasons := 0
+
+	if failing := state.FailingTests(); len(failing) > 0 {
+		reasons++
+		fmt.Println("BLOCKED BECAUSE")
+		for _, test := range failing {
+			fmt.Printf("  ✗ %s failed\n", test.Name)
+			if test.Command != "" {
+				fmt.Printf("      %s\n", test.Command)
+			}
+			evidence = append(evidence, test.Evidence...)
+		}
+		fmt.Println()
+	}
+
+	// Outstanding is every requirement that is not complete, which is the same
+	// rule DeriveStatus uses. Listing only blocked and unresolved ones left a
+	// merely-unverified requirement invisible, so the answer read "nothing is
+	// blocking it" directly under a status of PARTIAL.
+	if outstanding := state.Outstanding(); len(outstanding) > 0 {
+		reasons++
+		fmt.Println("REQUIREMENTS NOT YET COMPLETE")
+		for _, r := range outstanding {
+			fmt.Printf("  %s %-4s %s [%s]\n", r.Status.Glyph(), r.ID, r.Description, r.Confidence.Label())
+			evidence = append(evidence, r.Evidence...)
+		}
+		fmt.Println()
+	}
+
+	// A rejected approach explains why the obvious fix is not the fix. Without
+	// it the reader re-derives it, which is the failure the product removes.
+	if len(state.Rejected) > 0 {
+		fmt.Println("WHY THE OBVIOUS APPROACH WAS NOT TAKEN")
+		for _, r := range state.Rejected {
+			fmt.Printf("  ✗ %s\n", r.Approach)
+			if r.Reason != "" {
+				fmt.Printf("      because %s\n", r.Reason)
+			}
+			evidence = append(evidence, r.Evidence...)
+		}
+		fmt.Println()
+	}
+
+	if reasons == 0 {
+		fmt.Println("NOTHING IS BLOCKING IT")
+		fmt.Println("  No failing test and no unresolved requirement is recorded.")
+		if !state.Capture.Complete() {
+			fmt.Println("  Note that capture was incomplete, so absence of a blocker")
+			fmt.Println("  here is not proof that none exists.")
+		}
+		fmt.Println()
+	}
+
+	if action, ok := state.PrimaryNextAction(); ok {
+		fmt.Println("RECOMMENDED NEXT ACTION")
+		fmt.Printf("  → [%s] %s\n", action.Confidence.Label(), action.Description)
+		if action.Rationale != "" {
+			fmt.Printf("      because %s\n", action.Rationale)
+		}
+		if len(action.SuggestedTests) > 0 {
+			fmt.Printf("      then run: %s\n", strings.Join(action.SuggestedTests, ", "))
+		}
+		fmt.Println()
+	}
+
+	if ev := model.DedupeEvidence(evidence); len(ev) > 0 {
+		// EvidenceList renders its own heading.
+		fmt.Println(render.EvidenceList(ev, 12))
+	} else {
+		fmt.Println("EVIDENCE")
+		fmt.Println("  None recorded. Treat everything above as unverified.")
+	}
+	return nil
 }

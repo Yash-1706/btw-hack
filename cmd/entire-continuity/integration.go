@@ -12,7 +12,6 @@ import (
 	"github.com/entire-continuity/continuity/internal/graph"
 	"github.com/entire-continuity/continuity/internal/model"
 	"github.com/entire-continuity/continuity/internal/normalize"
-	"github.com/entire-continuity/continuity/internal/render"
 )
 
 // ---------------------------------------------------------------- checkpoints
@@ -294,10 +293,9 @@ func (a *app) graphCmd(ctx context.Context, args []string) error {
 			Target:      target,
 			Confidence:  model.Recommended,
 		})
+		// Render already carries its own evidence block; printing a second one
+		// here duplicated the heading.
 		fmt.Print(v.Render())
-		if len(v.Evidence) > 0 {
-			fmt.Printf("\nEVIDENCE\n%s\n", render.EvidenceList(v.Evidence, 20))
-		}
 		return nil
 
 	default:

@@ -206,7 +206,7 @@ func (g *localGo) Impact(ctx context.Context, symbol string) (model.GraphImpact,
 		if d.body == nil || d.sameDeclAs(*target) {
 			continue
 		}
-		plain, selector := callShapes(d.body, name)
+		plain, selector := shapesFor(*target, d.body, name)
 		if !d.reaches(*target, plain, selector) {
 			continue
 		}
@@ -737,4 +737,55 @@ func relSlash(root, p string) string {
 		rel = p
 	}
 	return filepath.ToSlash(rel)
+}
+
+// shapesFor picks the right reference test for the kind of thing target is.
+//
+// A function is reached by being called, and callShapes looks for exactly that.
+// A type is never called — it is constructed, embedded, or named in a field, a
+// parameter or a return. Asking callShapes about a type therefore always
+// answered "no callers", and the recommendation that followed read as "the
+// blast radius is its own definition", which for a widely-used struct is the
+// most dangerous possible wrong answer: it invites an edit to something half
+// the package depends on.
+func shapesFor(target decl, body *ast.BlockStmt, name string) (plain, selector bool) {
+	if isTypeDecl(target) {
+		return referenceShapes(body, name)
+	}
+	return callShapes(body, name)
+}
+
+// isTypeDecl reports whether a declaration is a type rather than a function.
+// Type declarations carry no body, which is the same signal the walk above uses.
+func isTypeDecl(d decl) bool {
+	switch strings.ToLower(d.sym.Kind) {
+	case "type", "struct", "interface":
+		return true
+	}
+	return false
+}
+
+// referenceShapes reports how a body mentions a type: as a bare identifier, or
+// through a selector. It deliberately matches any mention rather than only
+// constructions, because &T{}, var x T, func(T), []T and struct embedding are
+// all ways of depending on T, and a blast radius that counted only one of them
+// would understate the risk — the error this analyser must not make.
+func referenceShapes(body *ast.BlockStmt, name string) (plain, selector bool) {
+	ast.Inspect(body, func(n ast.Node) bool {
+		if plain && selector {
+			return false
+		}
+		switch x := n.(type) {
+		case *ast.SelectorExpr:
+			if x.Sel != nil && x.Sel.Name == name {
+				selector = true
+			}
+		case *ast.Ident:
+			if x.Name == name {
+				plain = true
+			}
+		}
+		return true
+	})
+	return plain, selector
 }

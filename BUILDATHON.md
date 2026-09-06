@@ -104,6 +104,7 @@ Two rules govern every layer, and they are correctness requirements rather than 
 | `internal/handoff` | Human, Markdown and JSON handoff from one state |
 | `internal/render` | Every human-facing view |
 | `internal/e2e` | Acceptance tests against a real git repository |
+| `examples/billing` | Demo domain (separate module) with one deliberately failing test |
 
 ### Test layers (plan §63)
 
@@ -248,7 +249,7 @@ Requires Go 1.26+. No third-party dependencies — standard library only.
 
 ```bash
 go build ./...
-go test ./...                     # 329 test functions across four layers
+go test ./...                     # 347 test functions across four layers
 go build -o entire-continuity ./cmd/entire-continuity
 ```
 
@@ -261,8 +262,19 @@ never heard of:
 ./entire-continuity task status <task-id>
 ./entire-continuity task handoff <task-id>
 ./entire-continuity task resume <task-id>
+./entire-continuity task explain <task-id>
 ./entire-continuity graph impact Validate
 ```
+
+Or against the demo domain, where a task is deliberately unfinished:
+
+```bash
+cd examples/billing && go test ./...     # TestDuplicateWebhook fails on purpose
+cd ../.. && ./entire-continuity --repo examples/billing graph impact WebhookProcessor
+```
+
+That last command is the §35 next-action validation: it names the callers, the components
+downstream and the six tests to run after the change — *before* the edit, not after it.
 
 ---
 
@@ -292,5 +304,5 @@ would be a poor advertisement for itself otherwise.
 - `internal/model` has no direct unit tests; it is exercised through every package that uses it.
   `contextbuild` and `handoff` are covered by the end-to-end layer rather than by unit tests.
 
-**Next steps:** live hook shims for OpenClaw and Hermes; a model-backed extractor; `task explain`
-and richer `task lineage` rendering; multi-repository tasks.
+**Next steps:** live hook shims driven by real OpenClaw and Hermes processes; a model-backed
+extractor behind the existing `model.Extractor` port; multi-repository tasks.
