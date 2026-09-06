@@ -103,6 +103,27 @@ Two rules govern every layer, and they are correctness requirements rather than 
 | `internal/contextbuild` | The resume pipeline |
 | `internal/handoff` | Human, Markdown and JSON handoff from one state |
 | `internal/render` | Every human-facing view |
+| `internal/e2e` | Acceptance tests against a real git repository |
+
+### Test layers (plan §63)
+
+| Layer | Where |
+|---|---|
+| Unit | every `internal/*` package — merge rules, evidence linking, drift, validation, redaction |
+| Adapter | `internal/normalize` — fixtures per format, plus the real Node shims round-tripped |
+| Integration | `internal/entire`, `internal/store` — session → checkpoint → task state |
+| End-to-end | `internal/e2e` — the four acceptance tests below, against a throwaway git repo |
+
+The acceptance tests are the ones that assert the product's actual claims:
+
+- **`TestFreshSessionRecoversTheTask`** (plan §43) — a session with no chat history recovers the
+  intent, the failing test, the requirements and, critically, **the approach already rejected**,
+  so it does not re-derive the broken one.
+- **`TestRepositoryDriftIsDetected`** (plan §46) — a human commits a change to a file the
+  checkpoint depends on; the next resume demands revalidation instead of replaying stale claims.
+- **`TestCrossAgentContinuity`** (plan §44) — one task id, two runtimes, identical intent,
+  rejected approaches and test state on both sides of the boundary.
+- **`TestNewFormatFlowsThroughTheWholePipeline`** — the curveball fixture end to end.
 
 ### Main workflow
 
@@ -227,7 +248,7 @@ Requires Go 1.26+. No third-party dependencies — standard library only.
 
 ```bash
 go build ./...
-go test ./...                     # 323 test functions
+go test ./...                     # 329 test functions across four layers
 go build -o entire-continuity ./cmd/entire-continuity
 ```
 
@@ -260,15 +281,16 @@ would be a poor advertisement for itself otherwise.
   analyser built on `go/ast`: genuine definition lookup, caller analysis and semantic diff over Go
   source. The findings in `docs/GRAPH.md` are real analysis of this repository, but they were
   produced by that analyser rather than by Entire Graph. `graph.NewCLI` targets the real thing.
-- **OpenClaw and Hermes were not installed.** Their envelope formats are implemented and
-  fixture-tested, and the third format is validated against the official curveball fixture, but
-  no live hook shim has been run against a real host process. The normalization layer is the part
-  that would not change.
+- **OpenClaw and Hermes were not installed.** The hook shims in `adapters/` implement their
+  documented surfaces, and `TestAdaptersFeedTheNormalizer` runs the real shims under Node and
+  decodes what they actually wrote — but no shim has been driven by a live host process. Wiring
+  one is a matter of registering it against that host's plugin API; the normalization layer it
+  feeds would not change.
 - **Semantic extraction is rule-based, not model-backed.** It sits behind `model.Extractor` so a
   model-backed implementation drops in unchanged. It deliberately **never** marks a requirement
   complete — a keyword rule has no basis to certify completion.
-- `internal/model`, `contextbuild` and `handoff` have no direct unit tests; they are covered
-  indirectly through the packages that use them and through end-to-end CLI runs.
+- `internal/model` has no direct unit tests; it is exercised through every package that uses it.
+  `contextbuild` and `handoff` are covered by the end-to-end layer rather than by unit tests.
 
 **Next steps:** live hook shims for OpenClaw and Hermes; a model-backed extractor; `task explain`
 and richer `task lineage` rendering; multi-repository tasks.
