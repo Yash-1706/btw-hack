@@ -71,9 +71,21 @@ func (h *heuristic) Extract(ctx context.Context, in model.ExtractionInput) (*mod
 	st.NextActions = nextActions(in.Deterministic, st.Requirements, now)
 
 	// The extractor ran, so the semantic half of capture is satisfied. Every
-	// other Capture flag belongs to whoever collected that input; writing them
-	// here could only downgrade a truth someone else established. Missing and
-	// Notes are append-only lists, so recording gaps there is always safe.
+	// other Capture flag belongs to whoever collected that input, and this
+	// extractor inspects no repository, reads no checkpoint and runs no test.
+	//
+	// Those flags are therefore inherited from the deterministic state this
+	// extraction was derived from rather than left false. Leaving them false
+	// would be read downstream as "checked and absent": the merge rule takes
+	// the incoming capture wholesale so that a fresh derivation can downgrade a
+	// checkpoint's stale claim, and a silent contributor would ride that rule to
+	// erase a truth it never examined. The observed symptom was a state
+	// reporting "git unavailable" directly beside the commit sha it had just
+	// verified. Inheriting is also simply accurate: this output describes the
+	// same capture as its input, plus semantic extraction.
+	if in.Deterministic != nil {
+		st.Capture = in.Deterministic.Capture.Or(st.Capture)
+	}
 	st.Capture.SemanticExtraction = true
 	if strings.TrimSpace(in.OriginalPrompt) == "" {
 		st.Capture.Missing = append(st.Capture.Missing, sourceOriginalPrompt)

@@ -241,6 +241,87 @@ type Capture struct {
 	Notes []string `json:"notes,omitempty"`
 }
 
+// Canonical names for the capture inputs recorded in Capture.Missing. They are
+// constants here rather than in the package that first writes them so that the
+// deriving side and the merging side cannot disagree about what a gap is
+// called — a disagreement would leave a stale gap in Missing forever.
+const (
+	MissingGit         = "git"
+	MissingCheckpoints = "checkpoints"
+	MissingTranscript  = "transcript"
+	MissingEvents      = "agent events"
+	MissingTests       = "structured test results"
+)
+
+// missingFor pairs each capture flag with the name reported when it is false.
+func (c Capture) missingFor() []struct {
+	ok   bool
+	name string
+} {
+	return []struct {
+		ok   bool
+		name string
+	}{
+		{c.GitAvailable, MissingGit},
+		{c.CheckpointAvailable, MissingCheckpoints},
+		{c.TranscriptAvailable, MissingTranscript},
+		{c.EventsAvailable, MissingEvents},
+		{c.TestResultsParsed, MissingTests},
+	}
+}
+
+// Or combines two captures for a merged state.
+//
+// The flags are OR-ed because they describe which inputs contributed facts to
+// the state, and a merged state contains the facts of both sides: if either
+// half actually read git, the merged state genuinely carries git-derived
+// evidence. Replacing the flags wholesale instead would let a contributor that
+// observes nothing — the semantic extractor, which reads no repository — erase
+// the record that the deterministic half did observe one, producing a state
+// that reports "git unavailable" while displaying a commit sha it verified.
+// Contradicting itself is the one thing this product must never do.
+//
+// Missing is filtered against the merged flags rather than blindly unioned, so
+// a gap that one side has since filled does not survive as a phantom.
+func (c Capture) Or(other Capture) Capture {
+	out := Capture{
+		GitAvailable:        c.GitAvailable || other.GitAvailable,
+		CheckpointAvailable: c.CheckpointAvailable || other.CheckpointAvailable,
+		TranscriptAvailable: c.TranscriptAvailable || other.TranscriptAvailable,
+		EventsAvailable:     c.EventsAvailable || other.EventsAvailable,
+		GraphAvailable:      c.GraphAvailable || other.GraphAvailable,
+		TestResultsParsed:   c.TestResultsParsed || other.TestResultsParsed,
+		SemanticExtraction:  c.SemanticExtraction || other.SemanticExtraction,
+	}
+
+	// Any gap whose flag is now satisfied is dropped; anything else — including
+	// names this package does not own — is preserved.
+	resolved := map[string]bool{}
+	for _, f := range out.missingFor() {
+		if f.ok {
+			resolved[f.name] = true
+		}
+	}
+	seen := map[string]bool{}
+	for _, name := range append(append([]string{}, c.Missing...), other.Missing...) {
+		if resolved[name] || seen[name] {
+			continue
+		}
+		seen[name] = true
+		out.Missing = append(out.Missing, name)
+	}
+
+	seenNote := map[string]bool{}
+	for _, n := range append(append([]string{}, c.Notes...), other.Notes...) {
+		if seenNote[n] {
+			continue
+		}
+		seenNote[n] = true
+		out.Notes = append(out.Notes, n)
+	}
+	return out
+}
+
 // Complete reports whether every capture input was available.
 func (c Capture) Complete() bool {
 	return c.GitAvailable && c.CheckpointAvailable && c.EventsAvailable &&

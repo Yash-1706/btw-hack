@@ -596,11 +596,20 @@ func repoObserved(r model.RepoState) bool {
 }
 
 // mergeCapture takes the incoming capture flags when there is an incoming state,
-// because they describe the capture the reader is about to act on. Doing so can
-// only over-report uncertainty — the merged state may still carry older
-// git-derived facts — and over-reporting uncertainty is the safe direction
-// (plan §33). Missing and Notes are unioned so that no recorded gap is ever
-// silently dropped.
+// because they describe the capture the reader is about to act on. A fresh
+// derivation that finds git unavailable *now* must be able to downgrade a
+// checkpoint's older claim that it was available, otherwise stale changed-file
+// lists would keep reading as verified. Missing and Notes are unioned so that
+// no recorded gap is ever silently dropped.
+//
+// This rule assumes the incoming capture actually speaks to every input — that
+// a false flag means "checked and absent", not "never looked". A contributor
+// that inspects nothing, such as the semantic extractor, would otherwise erase
+// the record that git had been read and produce a state reporting "git
+// unavailable" beside a commit sha it had verified. That is why such a
+// contributor inherits the capture of the state it derived from before it gets
+// here (see internal/semantic), rather than merge trying to guess who produced
+// what.
 func mergeCapture(prev, next model.Capture, hasNext bool) model.Capture {
 	out := prev
 	if hasNext {
