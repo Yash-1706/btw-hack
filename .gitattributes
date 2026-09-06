@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.go text eol=lf
+*.json text eol=lf
+*.ndjson text eol=lf
+*.jsonl text eol=lf
+*.golden text eol=lf
+*.md text eol=lf
+*.exe binary
+*.pdf binary
