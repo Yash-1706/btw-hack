@@ -1,0 +1,10 @@
+{
+  "checkpoint_id": "cp_c446cc98e255",
+  "session_id": "buildathon_main",
+  "agent": "human",
+  "label": "CP2 last stable state before the Noon Curveball",
+  "commit_sha": "b8db8c5f62db05f20d063920415efbb20841ba2f",
+  "branch": "master",
+  "created_at": "2026-09-06T08:03:35.3949412Z",
+  "state_hash": "sha256:b3fb689eb23896e66473e846c325d942"
+}

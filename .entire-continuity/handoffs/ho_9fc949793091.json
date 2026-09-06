@@ -1,0 +1,14 @@
+{
+  "id": "ho_9fc949793091",
+  "task_id": "task_9926d809210c5f05",
+  "from_session": "buildathon_main",
+  "from_agent": "human",
+  "to_session": "hermes_continuation_01",
+  "to_agent": "hermes",
+  "source_checkpoint": "cp_c8aa7a86569c",
+  "state_hash": "sha256:7746acdd0e4076076d84370ac598e537",
+  "created_at": "2026-09-06T08:03:45.2669227Z",
+  "next_action": "Resolve R1: Build a task-centric continuity layer for Entire so a software task can move between OpenClaw, Hermes and human workers without losing engineering state",
+  "outstanding": 2,
+  "critical_failures": 0
+}

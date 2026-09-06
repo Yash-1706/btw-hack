@@ -396,15 +396,27 @@ func (a *app) taskConstraint(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	// The event was already appended, so the derivation in currentState has
+	// produced a Constraint for it with an id of its own. Reuse that record
+	// rather than minting a second one: inventing an id here produced C2 for the
+	// first constraint a task ever received, and left two entries describing one
+	// event. This command's job is only to say what the constraint *affects*,
+	// which the event cannot express.
 	c := model.Constraint{
-		ID:                   fmt.Sprintf("C%d", len(state.Constraints)+1),
-		Text:                 *text,
-		Source:               *source,
-		AddedAt:              now,
-		AffectedRequirements: splitList(*affects),
-		ChangedAssumptions:   splitList(*invalidates),
-		Evidence:             []model.Evidence{ev.AsEvidence()},
+		ID:       fmt.Sprintf("C%d", len(state.Constraints)+1),
+		Text:     *text,
+		Source:   *source,
+		AddedAt:  now,
+		Evidence: []model.Evidence{ev.AsEvidence()},
 	}
+	for _, existing := range state.Constraints {
+		if strings.TrimSpace(existing.Text) == strings.TrimSpace(*text) {
+			c = existing
+			break
+		}
+	}
+	c.AffectedRequirements = splitList(*affects)
+	c.ChangedAssumptions = splitList(*invalidates)
 	updated := merge.ApplyConstraint(state, c, merge.Options{Clock: a.clock})
 	if err := a.store.PutState(ctx, t.ID, updated); err != nil {
 		return err

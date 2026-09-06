@@ -1,0 +1,271 @@
+{
+  "schema_version": 1,
+  "task": {
+    "id": "task_9926d809210c5f05",
+    "title": "Entire Continuity: task continuity across agents",
+    "original_intent": "Build a task-centric continuity layer for Entire so a software task can move between OpenClaw, Hermes and human workers without losing engineering state. Must normalize agent lifecycle events into one vocabulary, must attach evidence to every semantic claim, must detect repository drift at resume, must never present incomplete context as complete, and needs tests across unit, adapter and end-to-end layers."
+  },
+  "status": "partial",
+  "requirements": [
+    {
+      "id": "R1",
+      "description": "Build a task-centric continuity layer for Entire so a software task can move between OpenClaw, Hermes and human workers without losing engineering state",
+      "status": "partial",
+      "confidence": "observed",
+      "source": "original_prompt",
+      "evidence": [
+        {
+          "kind": "file",
+          "ref": ".entire-continuity/tasks/task_9926d809210c5f05/sessions/hermes_continuation_01.json",
+          "path": ".entire-continuity/tasks/task_9926d809210c5f05/sessions/hermes_continuation_01.json",
+          "detail": "changed file (A)",
+          "captured_at": "2026-09-06T08:03:44.7533796Z"
+        },
+        {
+          "kind": "file",
+          "ref": ".entire-continuity/tasks/task_9926d809210c5f05/state.json",
+          "path": ".entire-continuity/tasks/task_9926d809210c5f05/state.json",
+          "detail": "changed file (A)",
+          "captured_at": "2026-09-06T08:03:25.5159691Z"
+        },
+        {
+          "kind": "prompt",
+          "ref": "original_prompt",
+          "line_start": 1,
+          "detail": "original prompt line 1 (cue:without)",
+          "captured_at": "2026-09-06T08:03:25.5159691Z"
+        }
+      ],
+      "updated_at": "2026-09-06T08:03:44.7533796Z"
+    },
+    {
+      "id": "R2",
+      "description": "Must normalize agent lifecycle events into one vocabulary, must attach evidence to every semantic claim, must detect repository drift at resume, must never present incomplete context as complete, and needs tests across unit, adapter and end-to-end layers",
+      "status": "partial",
+      "confidence": "observed",
+      "source": "original_prompt",
+      "evidence": [
+        {
+          "kind": "file",
+          "ref": ".entire-continuity/tasks/task_9926d809210c5f05/events.ndjson",
+          "path": ".entire-continuity/tasks/task_9926d809210c5f05/events.ndjson",
+          "detail": "changed file (A)",
+          "captured_at": "2026-09-06T08:03:25.5159691Z"
+        },
+        {
+          "kind": "prompt",
+          "ref": "original_prompt",
+          "line_start": 1,
+          "detail": "original prompt line 1 (cue:must)",
+          "captured_at": "2026-09-06T08:03:25.5159691Z"
+        }
+      ],
+      "updated_at": "2026-09-06T08:03:44.7533796Z"
+    }
+  ],
+  "completed_work": [],
+  "in_progress": [],
+  "failed_attempts": [],
+  "decisions": [],
+  "rejected_approaches": [],
+  "assumptions": [],
+  "tests": [],
+  "changed_files": [],
+  "risks": [],
+  "next_actions": [
+    {
+      "description": "Resolve R1: Build a task-centric continuity layer for Entire so a software task can move between OpenClaw, Hermes and human workers without losing engineering state",
+      "rationale": "R1 shares vocabulary with changed file .entire-continuity/tasks/task_9926d809210c5f05/sessions/hermes_continuation_01.json, but nothing shows it is finished (keyword correlation, not proof).",
+      "target": ".entire-continuity/tasks/task_9926d809210c5f05/sessions/hermes_continuation_01.json",
+      "priority": 0,
+      "confidence": "recommended",
+      "evidence": [
+        {
+          "kind": "file",
+          "ref": ".entire-continuity/tasks/task_9926d809210c5f05/sessions/hermes_continuation_01.json",
+          "path": ".entire-continuity/tasks/task_9926d809210c5f05/sessions/hermes_continuation_01.json",
+          "detail": "changed file (A)",
+          "captured_at": "2026-09-06T08:03:44.7533796Z"
+        },
+        {
+          "kind": "prompt",
+          "ref": "original_prompt",
+          "line_start": 1,
+          "detail": "original prompt line 1 (cue:without)",
+          "captured_at": "2026-09-06T08:03:44.7533796Z"
+        }
+      ],
+      "graph_verified": false
+    },
+    {
+      "description": "Resolve R2: Must normalize agent lifecycle events into one vocabulary, must attach evidence to every semantic claim, must detect repository drift at resume, must never present incomplete context as complete, and needs tests across unit, adapter and end-to-end layers",
+      "rationale": "R2 shares vocabulary with changed file .entire-continuity/tasks/task_9926d809210c5f05/events.ndjson, but nothing shows it is finished (keyword correlation, not proof).",
+      "target": ".entire-continuity/tasks/task_9926d809210c5f05/events.ndjson",
+      "priority": 1,
+      "confidence": "recommended",
+      "evidence": [
+        {
+          "kind": "file",
+          "ref": ".entire-continuity/tasks/task_9926d809210c5f05/events.ndjson",
+          "path": ".entire-continuity/tasks/task_9926d809210c5f05/events.ndjson",
+          "detail": "changed file (A)",
+          "captured_at": "2026-09-06T08:03:44.7533796Z"
+        },
+        {
+          "kind": "prompt",
+          "ref": "original_prompt",
+          "line_start": 1,
+          "detail": "original prompt line 1 (cue:must)",
+          "captured_at": "2026-09-06T08:03:44.7533796Z"
+        }
+      ],
+      "graph_verified": false
+    }
+  ],
+  "constraints": [
+    {
+      "id": "C1",
+      "text": "The agent released a new transcript and lifecycle event format. The integration must support both the original and the new format, unknown events must not crash it, an incomplete transcript must produce a partial result rather than a discarded session, existing checkpoint behaviour must remain compatible, and the implementation must not be duplicated per format.",
+      "source": "buildathon_curveball",
+      "added_at": "2026-09-06T08:03:25.2041203Z",
+      "evidence": [
+        {
+          "kind": "event",
+          "ref": "ConstraintAdded",
+          "detail": "The agent released a new transcript and lifecycle event format. The integration must support both the original and the new format, unknown events must not crash it, an incomplete transcript must produce a partial result rather than a discarded session, existing checkpoint behaviour must remain compatible, and the implementation must not be duplicated per format.",
+          "session_id": "buildathon_main",
+          "captured_at": "2026-09-06T08:03:25.2041203Z"
+        }
+      ]
+    }
+  ],
+  "sessions": [
+    {
+      "session_id": "buildathon_main",
+      "agent": "human",
+      "role": "main",
+      "started_at": "2026-09-06T08:03:24.944104Z",
+      "ended_at": "0001-01-01T00:00:00Z"
+    },
+    {
+      "session_id": "hermes_continuation_01",
+      "agent": "hermes",
+      "role": "main",
+      "started_at": "2026-09-06T08:03:44.319832Z",
+      "ended_at": "0001-01-01T00:00:00Z"
+    }
+  ],
+  "checkpoints": [
+    {
+      "checkpoint_id": "cp_64f6c427905b",
+      "session_id": "buildathon_main",
+      "agent": "human",
+      "label": "CP1 initial understanding and intended architecture",
+      "commit_sha": "b8db8c5f62db05f20d063920415efbb20841ba2f",
+      "branch": "master",
+      "created_at": "2026-09-06T08:03:34.9704009Z"
+    },
+    {
+      "checkpoint_id": "cp_c446cc98e255",
+      "session_id": "buildathon_main",
+      "agent": "human",
+      "label": "CP2 last stable state before the Noon Curveball",
+      "commit_sha": "b8db8c5f62db05f20d063920415efbb20841ba2f",
+      "branch": "master",
+      "created_at": "2026-09-06T08:03:35.3949412Z"
+    },
+    {
+      "checkpoint_id": "cp_b5f07496d8f5",
+      "session_id": "buildathon_main",
+      "agent": "human",
+      "label": "CP3 Graph impact analysis before editing",
+      "commit_sha": "b8db8c5f62db05f20d063920415efbb20841ba2f",
+      "branch": "master",
+      "created_at": "2026-09-06T08:03:35.8234781Z"
+    },
+    {
+      "checkpoint_id": "cp_c8aa7a86569c",
+      "session_id": "buildathon_main",
+      "agent": "human",
+      "label": "CP4 response to the Noon Curveball",
+      "commit_sha": "b8db8c5f62db05f20d063920415efbb20841ba2f",
+      "branch": "master",
+      "created_at": "2026-09-06T08:03:36.2499292Z"
+    }
+  ],
+  "evidence": [
+    {
+      "kind": "commit",
+      "ref": "b8db8c5f62db05f20d063920415efbb20841ba2f",
+      "detail": "master",
+      "captured_at": "0001-01-01T00:00:00Z"
+    },
+    {
+      "kind": "checkpoint",
+      "ref": "cp_64f6c427905b",
+      "detail": "CP1 initial understanding and intended architecture",
+      "session_id": "buildathon_main",
+      "captured_at": "2026-09-06T08:03:34.9704009Z"
+    },
+    {
+      "kind": "checkpoint",
+      "ref": "cp_b5f07496d8f5",
+      "detail": "CP3 Graph impact analysis before editing",
+      "session_id": "buildathon_main",
+      "captured_at": "2026-09-06T08:03:35.8234781Z"
+    },
+    {
+      "kind": "checkpoint",
+      "ref": "cp_c446cc98e255",
+      "detail": "CP2 last stable state before the Noon Curveball",
+      "session_id": "buildathon_main",
+      "captured_at": "2026-09-06T08:03:35.3949412Z"
+    },
+    {
+      "kind": "checkpoint",
+      "ref": "cp_c8aa7a86569c",
+      "detail": "CP4 response to the Noon Curveball",
+      "session_id": "buildathon_main",
+      "captured_at": "2026-09-06T08:03:36.2499292Z"
+    },
+    {
+      "kind": "session",
+      "ref": "buildathon_main",
+      "result": "active",
+      "detail": "Human",
+      "session_id": "buildathon_main",
+      "captured_at": "2026-09-06T08:03:24.944104Z"
+    },
+    {
+      "kind": "session",
+      "ref": "hermes_continuation_01",
+      "result": "active",
+      "detail": "Hermes",
+      "session_id": "hermes_continuation_01",
+      "captured_at": "2026-09-06T08:03:44.319832Z"
+    }
+  ],
+  "repo": {
+    "repo": "Yash-1706/btw-hack",
+    "branch": "master",
+    "commit_sha": "b8db8c5f62db05f20d063920415efbb20841ba2f",
+    "dirty": true,
+    "tree_hash": "sha256:54ebb0831a4a33c92d8e5893da3bf5289209fed7cdb862ef040f9d085cd3f6c7",
+    "observed_at": "2026-09-06T08:03:44.4454406Z"
+  },
+  "capture": {
+    "git_available": true,
+    "checkpoint_available": true,
+    "transcript_available": false,
+    "events_available": true,
+    "graph_available": false,
+    "test_results_parsed": false,
+    "semantic_extraction": true,
+    "missing": [
+      "checkpoints",
+      "structured test results",
+      "transcript"
+    ]
+  },
+  "generated_at": "2026-09-06T08:03:44.7551474Z"
+}
