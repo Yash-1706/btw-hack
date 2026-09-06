@@ -1,7 +1,9 @@
 # Noon Curveball — Track 3: The agent changed its format
 
-**Status:** analysis complete, Graph impact analysis pending, implementation pending.
-**Pre-curveball baseline:** commit `f616d60` (frozen domain contract) plus the wave-1 v1 packages.
+**Status:** implemented and tested.
+**Pre-curveball baseline:** commit `e04266c` — the last stable state before any curveball edit.
+**Graph impact analysis:** `2a6250b`, run *before* editing. See [GRAPH.md](GRAPH.md).
+**Implementation:** `3f2ffa6`.
 
 ---
 
@@ -135,11 +137,75 @@ _This section is completed with real `graph impact` output before any code is ed
 
 ---
 
-## 6. Open dependency
+## 6. What the real fixture changed
 
-The curveball card states a JSONL fixture representing the new format is attached, and to confirm
-with a mentor that it matches this integration. **That fixture was not present in the materials
-available to this workspace.** The new-format `FormatSpec` is therefore written against the card's
-description and is deliberately fixture-driven: swapping in the official fixture means replacing
-`internal/normalize/testdata/new_format.jsonl` and, if the field names differ, editing one table —
-not touching the decode engine.
+The official JSONL fixture arrived after the analysis above was written, and it invalidated part
+of it. Recording that rather than quietly editing the prediction, because the difference is the
+point: the fixture broke *more* than the card's description implied.
+
+`internal/normalize/testdata/lifecycle_v2_acmecode.jsonl`, 17 records from a runtime calling
+itself **AcmeCode 1.4.2**. Three properties were not predictable from the card:
+
+1. **It carries no `task_id` at all.** The predicted design assumed the new format would still
+   name a task. It does not — it names a `repository`, a `branch` and a `session_id`. This is what
+   turned the Graph finding about `Validate`'s three callers from interesting into decisive: an
+   event with no task id fails validation at the boundary. The anchor is now *derived* through the
+   existing `model.NewTaskID(repo, branch, session)`, which also makes ingestion idempotent — the
+   same transcript always lands on the same task.
+
+2. **It names a runtime outside the enumerated vocabulary.** `AgentKind.Valid` rejected anything
+   but the four constants, so every AcmeCode event would have failed validation. The closed agent
+   vocabulary was part of the same invalidated assumption — *we can enumerate the world* — and was
+   widened to accept any safe identifier. Two packages had already built private workarounds for
+   this (`render` printed `Unknown (cursor)`, `entire` coerced to `unknown`); both are now
+   redundant, which is the tell that the defect was in the model rather than in them.
+
+3. **It splits a tool call across two records** correlated by `call_id`. A test outcome is only
+   knowable by remembering the call that produced it, so the decoder is stateful for the length of
+   a stream. This is what lets the fixture's failing run (`exit_code 1`, "1 failed, 7 passed") and
+   its later passing run (`exit_code 0`, "8 passed") resolve against each other under the §32 merge
+   rule — a failing test stays failed until a *newer result for the same name* proves otherwise.
+
+The fixture also exercised two defects that had nothing to do with formats, found only because a
+real transcript was run end to end:
+
+- The heuristic extractor mined rejection cues from **user prompts**, so the prompt "Coupons
+  should be **rejected** if expired…" was recorded as a *rejected approach*. That tells the next
+  worker not to build the very thing they were asked for — worse than extracting nothing. Cue
+  mining is now restricted to agent-authored events.
+- A task created by ingestion never recovered its **original intent**, the one field a later
+  worker cannot reconstruct from the diff. It is now lifted from the checkpoint's stated intent,
+  and the opening prompt is fed separately to requirement extraction, because the polished intent
+  line and the prompt are different things and only the prompt carries the obligations.
+
+## 7. Verification
+
+```
+go test ./...          # 323 test functions, all packages green
+```
+
+The four cases the card requires each have a test in `internal/normalize/format_test.go`:
+
+| Case | Test |
+|---|---|
+| Original format | `TestOriginalFormatsStillDecode` — asserts the v1 fixtures decode **byte-identically** through the new path and the old one |
+| New format | `TestLifecycleV2Fixture`, `TestLifecycleV2CorrelatesToolResults` |
+| Unknown events | `TestUnknownEventsAreRetainedNotDropped`, `TestUnknownEventsInOriginalFormat` |
+| Incomplete input | `TestIncompleteTranscriptProducesPartialResult`, `TestHeadlessTranscriptStillAnchors` |
+
+Plus `TestMixedFormatStream`, which decodes a single stream containing both formats at once.
+
+The first row is the one that matters for "preserves existing behaviour": it does not check that
+the old fixtures still *work*, it checks that they produce exactly the same events they did
+before, by running both paths and comparing.
+
+End to end, through the real CLI:
+
+```bash
+entire-continuity ingest --file internal/normalize/testdata/lifecycle_v2_acmecode.jsonl
+entire-continuity task status <task-id>
+```
+
+recovers the intent, both test runs (resolved failing → passing by the merge rule), the
+checkpoint, the session lineage and the runtime name — from a transcript in a format this build
+had never seen, emitted by a runtime it had never heard of.

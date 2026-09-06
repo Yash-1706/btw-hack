@@ -1,4 +1,5 @@
 /entire-continuity
 /entire-continuity.exe
-/.entire-continuity/
+# .entire-continuity/ is committed on purpose: the checkpoint history is
+# submission evidence, not scratch state.
 *.exe
