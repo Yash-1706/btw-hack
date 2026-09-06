@@ -113,10 +113,15 @@ func checkStateSchema(s *model.EngineeringState) error {
 	return fmt.Errorf("engineering state schema version %d is newer than this build understands (%d)", s.SchemaVersion, model.SchemaVersion)
 }
 
-// normalizeAgent maps an unrecognised agent kind onto AgentUnknown. Honesty
-// beats convenience: "unknown" is a true statement about a checkpoint whose
-// producer we do not recognise, whereas silently keeping a bogus value would
-// let it be rendered as though it named a real runtime (plan §12).
+// normalizeAgent keeps any usable agent identity and falls back to
+// AgentUnknown only for a value that cannot be one.
+//
+// The set of runtimes is open (see model.AgentKind.Valid), so a checkpoint
+// produced by a runtime this build has never integrated with keeps the name its
+// producer gave — that name is a fact about the checkpoint, and discarding it
+// would lose the only thing the producer said about itself. A value that is not
+// a safe identifier is still reported as unknown rather than rendered as though
+// it named a real runtime (plan §12).
 func normalizeAgent(a model.AgentKind) model.AgentKind {
 	if a.Valid() {
 		return a

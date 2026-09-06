@@ -165,6 +165,12 @@ type mapped struct {
 	// what it actually contained instead of just failing.
 	name string
 	ok   bool
+	// ignored marks a record this build recognises and deliberately does not
+	// model, such as a token-usage line. It is reported separately from an
+	// unrecognised name because the two mean different things to a reader:
+	// "we know what that is and it carries no continuity meaning" versus
+	// "we could not read that, so your timeline has a hole in it".
+	ignored bool
 }
 
 // recordMapper interprets one raw record for a particular host runtime.

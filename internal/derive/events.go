@@ -398,3 +398,66 @@ func deriveConstraints(events []model.AgentEvent) ([]model.Constraint, []string)
 	}
 	return out, notes
 }
+
+// countUnknownEvents counts records retained under model.EventUnknown: ones a
+// host emitted whose lifecycle name this build does not map.
+func countUnknownEvents(events []model.AgentEvent) int {
+	n := 0
+	for _, e := range events {
+		if e.Type == model.EventUnknown {
+			n++
+		}
+	}
+	return n
+}
+
+// originalIntentFrom recovers the task's original intent from the event stream.
+//
+// Original intent is the one field a later worker cannot reconstruct from the
+// repository: the diff shows what changed, never what was asked for. When a host
+// states it, capturing it here is the difference between a resumable task and
+// one whose purpose has to be guessed at (plan §41, §49).
+//
+// A checkpoint's explicit intent wins over the opening prompt, because it is the
+// host's considered statement of the goal rather than the first thing typed.
+// Both are direct quotes, never a summary: an inferred intent would be exactly
+// the fabrication this product exists to remove.
+func originalIntentFrom(events []model.AgentEvent) string {
+	for _, e := range events {
+		if e.Type == model.CheckpointCreated {
+			if intent := strings.TrimSpace(e.Attr("intent")); intent != "" {
+				return intent
+			}
+		}
+	}
+	for _, e := range events {
+		// The first turn of a session is the request that started it.
+		if e.Type == model.TurnStarted {
+			if s := strings.TrimSpace(e.Summary); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+// OriginalPrompt returns the request that started the task: the text of the
+// first turn a host recorded.
+//
+// It is deliberately separate from the task's original intent. A checkpoint's
+// stated intent is the better one-line answer to "what is this task for", but
+// the prompt is where the obligations live — "should be rejected if expired",
+// "add tests" — and plan §13 extracts requirements from the prompt. Feeding a
+// polished intent line to requirement extraction loses most of them.
+func OriginalPrompt(events []model.AgentEvent) string {
+	sorted := append([]model.AgentEvent(nil), events...)
+	model.SortEvents(sorted)
+	for _, e := range sorted {
+		if e.Type == model.TurnStarted {
+			if s := strings.TrimSpace(e.Summary); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}

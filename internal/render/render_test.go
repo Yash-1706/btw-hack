@@ -451,10 +451,10 @@ func TestConstraintEvidenceReachesTheIndex(t *testing.T) {
 	}
 }
 
-// TestDistinctAgentsAreNotCollapsed: model.AgentKind.Display collapses every
-// value outside its enum to "Unknown", so two third-party runtimes drew two
-// branches with the same title and the summary read "Unknown → Unknown". The
-// runtime identity is the one thing the §51 tree exists to show (plan §44).
+// TestDistinctAgentsAreNotCollapsed: two third-party runtimes must draw two
+// distinguishable branches. They once both rendered as "Unknown", so the
+// summary read "Unknown → Unknown" and one runtime appeared to have run twice.
+// The runtime identity is the one thing the §51 tree exists to show (plan §44).
 func TestDistinctAgentsAreNotCollapsed(t *testing.T) {
 	l := model.Lineage{
 		Task: model.Task{ID: "TASK-1"},
@@ -464,7 +464,7 @@ func TestDistinctAgentsAreNotCollapsed(t *testing.T) {
 		},
 	}
 	out := Lineage(l)
-	for _, want := range []string{"Unknown (cursor)", "Unknown (aider)"} {
+	for _, want := range []string{"Cursor", "Aider"} {
 		if !has(out, want) {
 			t.Errorf("lineage never names the runtime %q:\n%s", want, out)
 		}

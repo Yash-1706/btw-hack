@@ -240,13 +240,14 @@ func lineageHandoffSection(l model.Lineage) section {
 
 // agentName is the display name for a runtime.
 //
-// model.AgentKind.Display collapses every value outside its four-name enum to
-// "Unknown", including an unrecorded agent and any runtime a third-party
-// adapter reports. Rendering that verbatim loses the one fact the §51 tree
-// exists to show — which runtimes touched the task — and draws two different
-// runtimes as two branches with the same title, which reads as one runtime
-// appearing twice. So an unrecognised kind keeps its raw identifier, and an
-// absent one is reported as absent rather than as the AgentUnknown runtime.
+// Which runtimes touched a task is the one fact the §51 tree exists to show, so
+// two different third-party runtimes must never draw two branches with the same
+// title — that reads as one runtime appearing twice. model.AgentKind.Display
+// now names any well-formed runtime under its own reported name, so the common
+// case needs nothing special here. What remains is the two cases Display cannot
+// speak for: an absent agent is reported as absent rather than as the
+// AgentUnknown runtime, and a value too malformed to be an identity at all
+// keeps its raw text beside the fallback so the reader can see what arrived.
 func agentName(a model.AgentKind) string {
 	if a == "" {
 		return "(agent not recorded)"

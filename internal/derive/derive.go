@@ -155,6 +155,14 @@ func State(ctx context.Context, in Input) (*model.EngineeringState, error) {
 	s.Evidence = append(s.Evidence, checkpointEvidence(s.Checkpoints)...)
 	s.Evidence = model.DedupeEvidence(s.Evidence)
 
+	// Recover the intent from the stream only when the caller did not already
+	// carry one. A caller-supplied intent came from the task record, which is
+	// the authoritative statement; the stream is the fallback for a task created
+	// by ingestion, where nobody typed one in.
+	if strings.TrimSpace(s.Task.OriginalIntent) == "" {
+		s.Task.OriginalIntent = originalIntentFrom(events)
+	}
+
 	s.Capture.GitAvailable = repo.available
 	s.Capture.EventsAvailable = len(events) > 0
 	s.Capture.CheckpointAvailable = len(s.Checkpoints) > 0
@@ -164,6 +172,18 @@ func State(ctx context.Context, in Input) (*model.EngineeringState, error) {
 	// neither, and claiming otherwise would be exactly the fabrication the
 	// product exists to remove (plan §48, Rule 7).
 	s.Capture.Missing = append(s.Capture.Missing, missingNames(s.Capture)...)
+
+	// A retained unknown event is a record the adapter could not interpret. It
+	// is stored so the timeline is not silently short, but the reader has to be
+	// told, or a partially-understood transcript renders exactly like a fully
+	// understood one — the failure this product exists to prevent (plan §33).
+	if n := countUnknownEvents(events); n > 0 {
+		s.Capture.TranscriptAvailable = false
+		s.Capture.Notes = append(s.Capture.Notes, fmt.Sprintf(
+			"%d event(s) used a lifecycle name this build does not map; they are kept in the "+
+				"timeline as unknown records, so this task's history is incomplete", n))
+		s.Capture.Missing = append(s.Capture.Missing, "complete agent lifecycle")
+	}
 
 	// Status is derived from the evidence rather than asserted, so a
 	// deterministic-only state never over-claims progress (plan §17).

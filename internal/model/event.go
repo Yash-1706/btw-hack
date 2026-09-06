@@ -27,6 +27,17 @@ const (
 	// ConstraintAdded carries a new requirement injected mid-task, such as the
 	// Buildathon Noon Curveball (plan §41). It never overwrites original intent.
 	ConstraintAdded EventType = "ConstraintAdded"
+
+	// EventUnknown is a record a host emitted whose lifecycle name this build
+	// does not map. It is a first-class event rather than a dropped one.
+	//
+	// Skipping such records silently was the original design, and it was wrong
+	// once host formats started changing underneath us: a timeline missing three
+	// records it could not read still renders as a clean, complete timeline, and
+	// the reader has no way to know. Retaining the record — with its original
+	// kind in Attrs["raw_kind"] — keeps the gap visible without inventing a
+	// lifecycle semantic the host never exposed, which plan §9 forbids.
+	EventUnknown EventType = "Unknown"
 )
 
 // AllEventTypes lists every normalized event type, used for validation.
@@ -36,8 +47,16 @@ func AllEventTypes() []EventType {
 		TurnStarted, TurnEnded, ToolUsed,
 		SubagentStarted, SubagentEnded,
 		CheckpointCreated, TaskResumed, HandoffCreated, ConstraintAdded,
+		EventUnknown,
 	}
 }
+
+// AttrRawKind holds the host's own name for a record mapped to EventUnknown.
+const AttrRawKind = "raw_kind"
+
+// AttrAgentName holds the runtime name a host reported for itself when that
+// name is not one this build integrates with directly.
+const AttrAgentName = "agent_name"
 
 // Valid reports whether t is a known normalized event type.
 func (t EventType) Valid() bool {
@@ -59,16 +78,73 @@ const (
 	AgentUnknown  AgentKind = "unknown"
 )
 
-// Valid reports whether a is a recognised agent runtime.
+// Valid reports whether a is usable as an agent identity.
+//
+// The four constants above are the runtimes this build integrates with deeply,
+// but the set of runtimes is not closed: a host can rename itself or a new one
+// can appear, and a transcript naming a runtime we have never heard of is still
+// a real transcript. Coercing such a runtime to AgentUnknown would discard the
+// one fact the host stated plainly about itself.
+//
+// So any safe identifier token is accepted. This is a strict widening — every
+// value that validated before still validates — which is what makes it safe to
+// change a rule three packages depend on (normalize, derive and the store all
+// call AgentEvent.Validate). The restriction that remains is on shape, not
+// membership: an agent name is used in output and as a map key, so it must be a
+// short, lower-case, printable token and nothing else.
 func (a AgentKind) Valid() bool {
 	switch a {
 	case AgentOpenClaw, AgentHermes, AgentHuman, AgentUnknown:
 		return true
 	}
-	return false
+	if len(a) == 0 || len(a) > 32 {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		c := a[i]
+		switch {
+		case c >= 'a' && c <= 'z', c >= '0' && c <= '9':
+		case (c == '-' || c == '_' || c == '.') && i > 0:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// NormalizeAgent turns a host-reported runtime name into an AgentKind, mapping
+// the runtimes we integrate with onto their constants and otherwise keeping the
+// host's own name in a safe form. It returns AgentUnknown only when the name
+// cannot be made into a usable token at all.
+func NormalizeAgent(raw string) AgentKind {
+	trimmed := strings.ToLower(strings.TrimSpace(raw))
+	if trimmed == "" {
+		return AgentUnknown
+	}
+	var b strings.Builder
+	for _, r := range trimmed {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '-' || r == '_' || r == '.' || r == ' ':
+			if b.Len() > 0 {
+				b.WriteRune('-')
+			}
+		}
+	}
+	candidate := AgentKind(strings.Trim(b.String(), "-"))
+	if len(candidate) > 32 {
+		candidate = candidate[:32]
+	}
+	if !candidate.Valid() {
+		return AgentUnknown
+	}
+	return candidate
 }
 
 // Display returns the presentation name used in lineage and handoff output.
+// A runtime this build does not know is shown under its own reported name
+// rather than as "Unknown", because that is what the host actually said.
 func (a AgentKind) Display() string {
 	switch a {
 	case AgentOpenClaw:
@@ -77,8 +153,17 @@ func (a AgentKind) Display() string {
 		return "Hermes"
 	case AgentHuman:
 		return "Human"
+	case AgentUnknown, "":
+		return "Unknown"
 	}
-	return "Unknown"
+	parts := strings.Split(string(a), "-")
+	for i, p := range parts {
+		if p == "" {
+			continue
+		}
+		parts[i] = strings.ToUpper(p[:1]) + p[1:]
+	}
+	return strings.Join(parts, " ")
 }
 
 // Role is the function a session performs within a task. Sub-agents carry the

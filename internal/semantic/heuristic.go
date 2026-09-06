@@ -315,6 +315,9 @@ func fileEvidence(f model.ChangedFile, now time.Time) []model.Evidence {
 func decisions(events []model.AgentEvent) []model.Decision {
 	out := make([]model.Decision, 0, len(events))
 	for _, ev := range events {
+		if !agentAuthored(ev) {
+			continue
+		}
 		s := tidy(ev.Summary)
 		if s == "" {
 			continue
@@ -353,6 +356,9 @@ func decisions(events []model.AgentEvent) []model.Decision {
 func rejected(events []model.AgentEvent) []model.RejectedApproach {
 	out := make([]model.RejectedApproach, 0, len(events))
 	for _, ev := range events {
+		if !agentAuthored(ev) {
+			continue
+		}
 		s := tidy(ev.Summary)
 		if s == "" {
 			continue
@@ -641,4 +647,24 @@ func pruneUnevidenced(st *model.EngineeringState) {
 		acts = append(acts, a)
 	}
 	st.NextActions = acts
+}
+
+// agentAuthored reports whether an event's summary is the agent's own account
+// of its work, as opposed to something said to it or about it.
+//
+// Only agent-authored text is mined for decisions and rejected approaches. The
+// distinction is not cosmetic: a user prompt states what the task *is*, and
+// mining it for rejection cues turns the goal into a warning. The observed
+// failure was a prompt reading "coupons should be rejected if expired" being
+// recorded as a rejected approach, which tells the next worker not to build the
+// very thing they were asked for — worse than extracting nothing at all.
+//
+// Unknown records are excluded too: a record whose lifecycle name we could not
+// map is not text we are entitled to interpret (plan §9).
+func agentAuthored(ev model.AgentEvent) bool {
+	switch ev.Type {
+	case model.TurnEnded, model.ToolUsed, model.SubagentEnded:
+		return true
+	}
+	return false
 }

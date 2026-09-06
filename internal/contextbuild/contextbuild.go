@@ -330,8 +330,16 @@ func extractSemantic(
 		Events:        events,
 		Deterministic: current,
 	}
-	if historical != nil {
+	// The prompt the task actually started from is the best source of
+	// requirements (plan §13), so it wins over a polished intent line. Both
+	// fallbacks matter: a task created by hand has an intent and no prompt, and
+	// a task ingested from a transcript has a prompt and no typed-in intent.
+	in.OriginalPrompt = derive.OriginalPrompt(events)
+	if strings.TrimSpace(in.OriginalPrompt) == "" && historical != nil {
 		in.OriginalPrompt = historical.Task.OriginalIntent
+	}
+	if strings.TrimSpace(in.OriginalPrompt) == "" && current != nil {
+		in.OriginalPrompt = current.Task.OriginalIntent
 	}
 	state, err := opts.Extractor.Extract(ctx, in)
 	if err != nil {

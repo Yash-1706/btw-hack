@@ -169,10 +169,22 @@ func (a *app) currentState(ctx context.Context, t model.Task) (*model.Engineerin
 		return nil, lineage, nil, err
 	}
 
+	// A task created by ingestion has no typed-in intent, but the transcript may
+	// state one; derivation recovers it. Feed that to the extractor, or a task
+	// whose goal we actually know would still report "no prompt captured" and
+	// extract no requirements from it.
+	prompt := derive.OriginalPrompt(events)
+	if strings.TrimSpace(prompt) == "" {
+		prompt = ref.OriginalIntent
+	}
+	if strings.TrimSpace(prompt) == "" && current != nil {
+		prompt = current.Task.OriginalIntent
+	}
+
 	if a.extractor != nil && a.extractor.Available(ctx) {
 		sem, serr := a.extractor.Extract(ctx, model.ExtractionInput{
 			Task:           ref,
-			OriginalPrompt: ref.OriginalIntent,
+			OriginalPrompt: prompt,
 			Events:         events,
 			Deterministic:  current,
 		})

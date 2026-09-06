@@ -137,15 +137,12 @@ func (a *app) checkpointList(ctx context.Context, args []string) error {
 
 func (a *app) ingest(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("ingest", flag.ContinueOnError)
-	agentName := fs.String("agent", "", "adapter that produced the events: openclaw or hermes (required)")
+	format := fs.String("format", string(normalize.FormatAuto),
+		"transcript format, or auto to detect per record: "+formatList())
+	task := fs.String("task", "", "task to ingest into (default: derived from the transcript)")
 	file := fs.String("file", "", "file to read (default: stdin)")
 	quiet := fs.Bool("quiet", false, "suppress the per-event summary")
 	if err := fs.Parse(args); err != nil {
-		return err
-	}
-	agent := model.AgentKind(strings.ToLower(*agentName))
-	norm, err := normalize.For(agent)
-	if err != nil {
 		return err
 	}
 
@@ -153,14 +150,31 @@ func (a *app) ingest(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	events, err := norm.Normalize(raw)
+
+	// The repository is the fallback anchor for a transcript that carries no
+	// task id and no session header — the incomplete case. Passing it here is
+	// what turns "this transcript cannot be filed" into a partial result.
+	opts := normalize.Options{Format: normalize.Format(*format), TaskID: *task}
+	if head, herr := a.repo.Head(ctx); herr == nil {
+		opts.Repo, opts.Branch = head.Repo, head.Branch
+	}
+
+	res, err := normalize.Stream(raw, opts)
 	if err != nil {
 		return err
 	}
+	events := res.Events
+
+	// The report is printed before anything is stored, and whether or not the
+	// read was clean. A caller must never have to infer from silence that a
+	// transcript was fully understood (plan §33, §47).
+	fmt.Print(res.Report.Summary())
+
 	if len(events) == 0 {
-		fmt.Println("No recognisable events in the input; nothing was ingested.")
+		fmt.Println("\nNothing could be ingested from this input.")
 		return nil
 	}
+	fmt.Println()
 
 	// Events arrive from an external agent that has no idea whether the task
 	// exists here yet, so ingest is responsible for anchoring them. Refusing
@@ -178,9 +192,11 @@ func (a *app) ingest(ctx context.Context, args []string) error {
 		}
 		head, _ := a.repo.Head(ctx)
 		now := a.clock.Now()
+		repo := firstNonEmpty(ev.Attr("repository"), head.Repo)
+		branch := firstNonEmpty(ev.Attr("branch"), head.Branch)
 		if err := a.store.CreateTask(ctx, model.Task{
-			ID: ev.TaskID, Repo: head.Repo, Branch: head.Branch,
-			RootSessionID: ev.SessionID, Title: "Ingested from " + agent.Display(),
+			ID: ev.TaskID, Repo: repo, Branch: branch,
+			RootSessionID: ev.SessionID, Title: "Ingested from " + ev.Agent.Display(),
 			Status: model.StatusActive, CreatedAt: now, UpdatedAt: now,
 		}); err != nil {
 			return err
@@ -194,13 +210,39 @@ func (a *app) ingest(ctx context.Context, args []string) error {
 		}
 	}
 
-	fmt.Printf("Ingested %d event(s) from %s into %d task(s).\n", len(events), agent.Display(), len(created))
+	fmt.Printf("Ingested %d event(s) into %d task(s).\n", len(events), len(created))
+	for id := range created {
+		fmt.Printf("  task %s\n", id)
+	}
 	if !*quiet {
+		fmt.Println()
 		for _, ev := range events {
-			fmt.Printf("  %-18s %-22s %s\n", ev.Type, ev.SessionID, ev.Summary)
+			kind := string(ev.Type)
+			if ev.Type == model.EventUnknown {
+				// Say plainly that this record was retained without being
+				// understood, rather than letting it read as a normal event.
+				kind = "Unknown(" + ev.Attr(model.AttrRawKind) + ")"
+			}
+			fmt.Printf("  %-28s %-22s %s\n", kind, ev.SessionID, truncate(ev.Summary, 60))
 		}
 	}
 	return nil
+}
+
+func formatList() string {
+	out := make([]string, 0, len(normalize.Formats()))
+	for _, f := range normalize.Formats() {
+		out = append(out, string(f))
+	}
+	return strings.Join(out, ", ")
+}
+
+func truncate(s string, n int) string {
+	s = strings.ReplaceAll(strings.TrimSpace(s), "\n", " ")
+	if len(s) <= n {
+		return s
+	}
+	return s[:n-1] + "…"
 }
 
 func readInput(file string) ([]byte, error) {

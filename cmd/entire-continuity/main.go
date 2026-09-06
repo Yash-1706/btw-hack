@@ -206,3 +206,13 @@ func firstArg(args []string) (string, []string) {
 	}
 	return "", args
 }
+
+// firstNonEmpty returns the first argument that is not blank.
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}

@@ -118,8 +118,12 @@ func TestAppendEventRejections(t *testing.T) {
 			mutate: func(e model.AgentEvent) model.AgentEvent { e.Timestamp = time.Time{}; return e },
 		},
 		{
-			name:   "unknown agent",
-			mutate: func(e model.AgentEvent) model.AgentEvent { e.Agent = "chatgpt"; return e },
+			// A runtime this build does not integrate with is storable — the
+			// agent vocabulary is open, so "chatgpt" is a fine identity. What
+			// is still rejected is a value that is not an identifier at all,
+			// because agent names reach output and map keys.
+			name:   "malformed agent",
+			mutate: func(e model.AgentEvent) model.AgentEvent { e.Agent = "Chat GPT!! <b>"; return e },
 		},
 		{
 			name:   "session is its own parent",

@@ -64,10 +64,24 @@ func TestParseCheckpoint(t *testing.T) {
 			},
 		},
 		{
-			// "unknown" is a true statement; keeping "borg" would let a
-			// nonexistent runtime be rendered as though it were real.
-			name:    "unrecognised agent becomes unknown",
+			// A runtime this build does not integrate with is still a runtime
+			// the checkpoint named. Coercing it to "unknown" discarded the one
+			// fact the producer stated about itself, which is why the agent
+			// vocabulary was widened; see model.AgentKind.Valid.
+			name:    "third-party agent keeps the name the checkpoint reported",
 			payload: `{"id":"cp_1","created_at":"2026-03-01T09:00:00Z","agent":"borg"}`,
+			check: func(t *testing.T, cp model.Checkpoint) {
+				if cp.Agent != model.AgentKind("borg") {
+					t.Errorf("Agent = %q, want %q", cp.Agent, "borg")
+				}
+			},
+		},
+		{
+			// Widening the vocabulary is not the same as accepting anything:
+			// a value that cannot be a safe identifier is still reported as
+			// unknown rather than rendered as though it named a real runtime.
+			name:    "malformed agent still becomes unknown",
+			payload: `{"id":"cp_1","created_at":"2026-03-01T09:00:00Z","agent":"Borg Corp!! <script>"}`,
 			check: func(t *testing.T, cp model.Checkpoint) {
 				if cp.Agent != model.AgentUnknown {
 					t.Errorf("Agent = %q, want %q", cp.Agent, model.AgentUnknown)
@@ -280,9 +294,9 @@ func TestCheckpointCreateArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "unrecognised agent is reported as unknown",
+			name: "third-party agent is passed through under its own name",
 			req:  model.CheckpointRequest{TaskID: "task_demo", Agent: model.AgentKind("borg")},
-			want: []string{"checkpoint", "create", "--json", "--task", "task_demo", "--agent", "unknown"},
+			want: []string{"checkpoint", "create", "--json", "--task", "task_demo", "--agent", "borg"},
 		},
 		{
 			name: "state travels on stdin",

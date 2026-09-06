@@ -557,7 +557,7 @@ func TestLocalCheckpointsReportsUnreadableFiles(t *testing.T) {
 	}
 }
 
-func TestLocalAgentNormalisedToUnknown(t *testing.T) {
+func TestLocalAgentNormalisation(t *testing.T) {
 	ctx := context.Background()
 	c := newTestLocal(t, t.TempDir(), testClock(time.Minute))
 
@@ -567,7 +567,8 @@ func TestLocalAgentNormalisedToUnknown(t *testing.T) {
 		want  model.AgentKind
 	}{
 		{"unset", "", model.AgentUnknown},
-		{"unrecognised", model.AgentKind("borg"), model.AgentUnknown},
+		{"third party keeps its name", model.AgentKind("borg"), model.AgentKind("borg")},
+		{"malformed becomes unknown", model.AgentKind("Borg Corp!!"), model.AgentUnknown},
 		{"known", model.AgentHermes, model.AgentHermes},
 	}
 	for _, tt := range tests {
